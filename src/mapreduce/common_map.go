@@ -2,17 +2,20 @@ package mapreduce
 
 import (
 	"hash/fnv"
+	"io/ioutil"
+	"os"
+	"encoding/json"
 )
 
 // doMap manages one map task: it reads one of the input files
 // (inFile), calls the user-defined map function (mapF) for that file's
 // contents, and partitions the output into nReduce intermediate files.
 func doMap(
-	jobName string, // the name of the MapReduce job
-	mapTaskNumber int, // which map task this is
-	inFile string,
-	nReduce int, // the number of reduce task that will be run ("R" in the paper)
-	mapF func(file string, contents string) []KeyValue,
+jobName string, // the name of the MapReduce job
+mapTaskNumber int, // which map task this is
+inFile string,
+nReduce int, // the number of reduce task that will be run ("R" in the paper)
+mapF func(file string, contents string) []KeyValue,
 ) {
 	//
 	// You will need to write this function.
@@ -53,6 +56,26 @@ func doMap(
 	//
 	// Remember to close the file after you have written all the values!
 	//
+	contents,_ := ioutil.ReadFile(inFile)
+	kvs := mapF(inFile, string(contents[:]))
+
+	var files []*os.File
+	var encs []*json.Encoder
+
+	for i:=0; i<nReduce; i++ {
+		file,_ := os.Create(reduceName(jobName, mapTaskNumber, i))
+		files = append(files, file)
+		encs = append(encs, json.NewEncoder(file))
+	}
+
+	for _, kv := range kvs {
+		par := ihash(kv.Key) % nReduce
+		encs[par].Encode(&kv)
+	}
+
+	for i:=0; i<nReduce; i++ {
+		files[i].Close()
+	}
 }
 
 func ihash(s string) int {
@@ -60,3 +83,4 @@ func ihash(s string) int {
 	h.Write([]byte(s))
 	return int(h.Sum32() & 0x7fffffff)
 }
+
