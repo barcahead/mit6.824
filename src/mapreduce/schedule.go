@@ -47,6 +47,8 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 					"Worker.DoTask",
 					DoTaskArgs{jobName, mapFiles[tid], phase, tid, n_other},
 					nil)
+				// Receivers always block until there is data to receive.
+				// If the channel is unbuffered, the sender blocks until the receiver has received the value.
 				go func() { registerChan <- srv }()
 			}
 		}(i)
